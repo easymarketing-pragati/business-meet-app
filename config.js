@@ -10,4 +10,4 @@ const APP_CONFIG = {
   gasUrl:        "https://script.google.com/macros/s/AKfycby28WQqptkushJgadmSLgROvzwiZp1OW7XXDmjjSMv9NkkmiSl-lAsvchNaBsPb2kvHwQ/exec",
   waPhoneId:     "YOUR_WHATSAPP_PHONE_ID",
   waToken:       "YOUR_WHATSAPP_ACCESS_TOKEN",
-};
+} ;
