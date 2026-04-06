@@ -1,4 +1,4 @@
-const APP_CONFIG = {
+var APP_CONFIG = {
   eventName:     "Pragati - Annual Business Meet 2026",
   eventDate:     "09 April 2026 · 10:00 AM",
   eventVenue:    "Saya By Treat, Bhiwandi",
@@ -10,4 +10,4 @@ const APP_CONFIG = {
   gasUrl:        "https://script.google.com/macros/s/AKfycby28WQqptkushJgadmSLgROvzwiZp1OW7XXDmjjSMv9NkkmiSl-lAsvchNaBsPb2kvHwQ/exec",
   waPhoneId:     "YOUR_WHATSAPP_PHONE_ID",
   waToken:       "YOUR_WHATSAPP_ACCESS_TOKEN",
-} ;
+};
