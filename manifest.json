@@ -1,0 +1,17 @@
+{
+  "name": "Annual Business Meet 2026",
+  "short_name": "BizMeet 2026",
+  "description": "Official registration app for the Annual Business Meet 2026",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#BA7517",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23BA7517'/><text y='130' x='96' font-size='110' text-anchor='middle' fill='white' font-family='system-ui' font-weight='700'>A</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

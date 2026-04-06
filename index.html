@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Annual Business Meet 2026</title>
+  <meta name="description" content="Register for the Annual Business Meet 2026"/>
+  <meta name="theme-color" content="#BA7517"/>
+  <link rel="manifest" href="manifest.json"/>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Config (edit config.js) -->
+  <script src="config.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --amber:      #BA7517;
+      --amber-l:    #FFF3DC;
+      --amber-d:    #854F0B;
+      --amber-dk:   #633806;
+      --bg:         #FAFAF8;
+      --bg2:        #F2F0EB;
+      --bg3:        #E8E6DF;
+      --card:       #FFFFFF;
+      --border:     rgba(0,0,0,0.10);
+      --border2:    rgba(0,0,0,0.18);
+      --text:       #1A1917;
+      --text2:      #5E5B55;
+      --text3:      #9A9690;
+      --success:    #1D9E75;
+      --success-bg: #E1F5EE;
+      --danger:     #C0392B;
+      --danger-bg:  #FAECE7;
+      --radius:     10px;
+      --radius-lg:  14px;
+      --font:       'Sora', system-ui, sans-serif;
+      --mono:       'JetBrains Mono', monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:     #181714;
+        --bg2:    #222019;
+        --bg3:    #2C2A22;
+        --card:   #1E1C17;
+        --border: rgba(255,255,255,0.10);
+        --border2:rgba(255,255,255,0.18);
+        --text:   #F0EDE6;
+        --text2:  #A09D96;
+        --text3:  #666360;
+        --amber-l:#2E2308;
+        --success-bg: #04342C;
+        --danger-bg:  #2E1008;
+      }
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+    #root { min-height: 100%; }
+    input, textarea, select {
+      font-family: var(--font); font-size: 14px; color: var(--text);
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: var(--radius); padding: 11px 13px; width: 100%;
+      outline: none; transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(186,117,23,0.12); }
+    textarea { resize: vertical; line-height: 1.55; }
+    button { font-family: var(--font); cursor: pointer; }
+    a { color: var(--amber); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const C = window.APP_CONFIG;
+
+// ── API helpers ──────────────────────────────────────────────
+async function gasApi(action, data = {}) {
+  if (!C.gasUrl || C.gasUrl === "YOUR_APPS_SCRIPT_WEB_APP_URL") {
+    await new Promise(r => setTimeout(r, 700));
+    if (action === "verify")   return { exists: false };
+    if (action === "register") return { success: true, id: "REG" + Math.random().toString(36).substr(2,6).toUpperCase() };
+    return { success: true };
+  }
+  try {
+    if (action === "verify") {
+      const r = await fetch(`${C.gasUrl}?action=verify&phone=${encodeURIComponent(data.phone)}`);
+      return r.json();
+    }
+    const r = await fetch(C.gasUrl, {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action, ...data })
+    });
+    return { success: true };
+  } catch(e) { return { error: e.message }; }
+}
+
+async function sendWhatsApp(phone, message) {
+  if (!C.waToken || C.waToken === "YOUR_WHATSAPP_ACCESS_TOKEN") {
+    await new Promise(r => setTimeout(r, 200));
+    return { success: true };
+  }
+  try {
+    const r = await fetch(`https://graph.facebook.com/v18.0/${C.waPhoneId}/messages`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${C.waToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: phone.replace(/[\s\-().+]/g, ""),
+        type: "text",
+        text: { body: message }
+      })
+    });
+    return r.json();
+  } catch(e) { return { error: e.message }; }
+}
+
+// ── Design tokens ────────────────────────────────────────────
+const styles = {
+  page: { maxWidth: 480, margin: "0 auto", padding: "1.25rem 1rem 3rem" },
+  card: { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: "1.25rem" },
+  label: { display: "block", fontSize: 12, fontWeight: 500, color: "var(--text2)", marginBottom: 5, letterSpacing: "0.03em" },
+  error: { fontSize: 12, color: "var(--danger)", marginTop: 4 },
+  field: { marginBottom: "1rem" },
+};
+
+function PrimaryBtn({ children, onClick, disabled, style = {} }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: "100%", padding: "13px 20px", fontSize: 14, fontWeight: 600,
+      background: disabled ? "var(--bg3)" : "var(--amber)",
+      color: disabled ? "var(--text3)" : "#fff",
+      border: "none", borderRadius: "var(--radius)",
+      transition: "opacity 0.15s, transform 0.1s",
+      ...style
+    }}
+    onMouseEnter={e => { if (!disabled) e.target.style.opacity = "0.9"; }}
+    onMouseLeave={e => { e.target.style.opacity = "1"; }}
+    onMouseDown={e => { if (!disabled) e.target.style.transform = "scale(0.99)"; }}
+    onMouseUp={e => { e.target.style.transform = "scale(1)"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GhostBtn({ children, onClick, style = {} }) {
+  return (
+    <button onClick={onClick} style={{
+      width: "100%", padding: "13px 20px", fontSize: 14, fontWeight: 500,
+      background: "transparent", color: "var(--text2)",
+      border: "1px solid var(--border2)", borderRadius: "var(--radius)",
+      ...style
+    }}>
+      {children}
+    </button>
+  );
+}
+
+// ── Progress ─────────────────────────────────────────────────
+const STEPS = ["phone","consent","social","register"];
+const STEP_LABELS = ["Phone","Consent","Follow","Register"];
+
+function ProgressBar({ step }) {
+  const idx = STEPS.indexOf(step);
+  if (idx < 0) return null;
+  return (
+    <div style={{ marginBottom: "1.75rem" }}>
+      <div style={{ height: 3, background: "var(--bg3)", borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
+        <div style={{ height: "100%", width: `${((idx + 1) / 4) * 100}%`, background: "var(--amber)", transition: "width 0.4s ease", borderRadius: 2 }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        {STEP_LABELS.map((l, i) => (
+          <span key={l} style={{
+            fontSize: 11, fontWeight: i === idx ? 600 : 400,
+            color: i < idx ? "var(--amber)" : i === idx ? "var(--text)" : "var(--text3)"
+          }}>
+            {i < idx ? "✓ " : ""}{l}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Header ───────────────────────────────────────────────────
+function Header({ onAdmin }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: "var(--amber)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>A</span>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text2)" }}>{C.companyName}</span>
+      </div>
+      <button onClick={onAdmin} style={{ fontSize: 11, color: "var(--text3)", background: "none", border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "var(--font)" }}>
+        Admin
+      </button>
+    </div>
+  );
+}
+
+// ── Landing ──────────────────────────────────────────────────
+function Landing({ onStart, onAdmin }) {
+  return (
+    <div>
+      <Header onAdmin={onAdmin} />
+      <div style={{ textAlign: "center", padding: "0.5rem 0 1.5rem" }}>
+        <div style={{ display: "inline-block", background: "var(--amber-l)", borderRadius: 6, padding: "4px 14px", marginBottom: "1.1rem" }}>
+          <span style={{ fontSize: 10, color: "var(--amber-d)", fontWeight: 600, letterSpacing: "0.12em" }}>OFFICIAL INVITATION</span>
+        </div>
+        <h1 style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.2, margin: "0 0 0.75rem", color: "var(--text)" }}>{C.eventName}</h1>
+        <p style={{ color: "var(--text2)", fontSize: 14, margin: "0 0 0.25rem" }}>{C.eventDate}</p>
+        <p style={{ color: "var(--text2)", fontSize: 14 }}>{C.eventVenue}</p>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "1.25rem 0" }}>
+        <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
+        <div style={{ width: 5, height: 5, background: "var(--amber)", transform: "rotate(45deg)" }} />
+        <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: "2rem" }}>
+        {[["Format","In-Person"],["Duration","Full Day"],["Seats",`${C.totalSeats}+`]].map(([l,v]) => (
+          <div key={l} style={{ background: "var(--bg2)", borderRadius: "var(--radius)", padding: "14px 8px", textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: 10, color: "var(--text3)", fontWeight: 500, letterSpacing: "0.06em" }}>{l.toUpperCase()}</p>
+            <p style={{ margin: "5px 0 0", fontSize: 15, fontWeight: 600 }}>{v}</p>
+          </div>
+        ))}
+      </div>
+
+      <PrimaryBtn onClick={onStart}>Register Now →</PrimaryBtn>
+      <p style={{ textAlign: "center", fontSize: 11, color: "var(--text3)", marginTop: "0.75rem" }}>
+        Complimentary for invited delegates · Have your mobile number ready
+      </p>
+    </div>
+  );
+}
+
+// ── Step 1: Phone ─────────────────────────────────────────────
+function PhoneStep({ phone, setPhone, error, loading, onNext, onBack }) {
+  return (
+    <div>
+      <button onClick={onBack} style={{ fontSize: 13, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", marginBottom: "1.25rem", padding: 0, fontFamily: "var(--font)" }}>← Back</button>
+      <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 0.4rem" }}>Your mobile number</h2>
+      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 1.75rem", lineHeight: 1.6 }}>
+        We'll cross-check your number against the invite list and send event updates via WhatsApp.
+      </p>
+      <div style={styles.field}>
+        <label style={styles.label}>MOBILE NUMBER</label>
+        <input
+          type="tel" placeholder="+91 98765 43210"
+          value={phone} onChange={e => setPhone(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && onNext()}
+          style={{ borderColor: error ? "var(--danger)" : undefined }}
+          autoFocus
+        />
+        {error && <p style={styles.error}>{error}</p>}
+      </div>
+      <PrimaryBtn onClick={onNext} disabled={loading}>
+        {loading ? "Verifying…" : "Continue →"}
+      </PrimaryBtn>
+      <p style={{ fontSize: 11, color: "var(--text3)", marginTop: "0.75rem", textAlign: "center", lineHeight: 1.6 }}>
+        Your number is matched against our secure invite list only.
+      </p>
+    </div>
+  );
+}
+
+// ── Step 2: Consent ───────────────────────────────────────────
+const CLAUSES = [
+  "Attendance at the Annual Business Meet 2026 (\"Event\") is voluntary and at the delegate's own risk. The delegate assumes full responsibility for their personal safety throughout the Event.",
+  "Acme Corporation, its directors, employees, agents and contractors shall not be liable for any personal injury, illness, loss of life, damage to or loss of personal property arising from or in connection with attendance at the Event.",
+  "The delegate consents to being photographed, filmed, and/or audio-recorded at the Event. Such material may be used for promotional, documentary, marketing, and archival purposes by Acme Corporation, including on digital platforms, without additional consent or compensation.",
+  "Personal data collected during registration (including name, mobile number, company information, and email) will be processed solely for event management, attendee communications, and post-event reporting, in accordance with applicable data protection laws.",
+  "The delegate agrees to comply with all applicable venue rules, health and safety regulations, fire evacuation procedures, and the Event Code of Conduct throughout their attendance.",
+  "Acme Corporation reserves the right to refuse entry to, or require the removal of, any delegate from the Event at its sole discretion and without liability.",
+  "These terms constitute the entire agreement between the delegate and Acme Corporation regarding attendance. By proceeding, the delegate confirms they have read, understood, and unconditionally agree to all terms stated herein.",
+];
+
+function ConsentStep({ consent, setConsent, onNext, onBack }) {
+  const scrollRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  function handleScroll(e) {
+    const el = e.target;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) setScrolled(true);
+  }
+
+  return (
+    <div>
+      <button onClick={onBack} style={{ fontSize: 13, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", marginBottom: "1.25rem", padding: 0, fontFamily: "var(--font)" }}>← Back</button>
+      <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 0.4rem" }}>Consent & liability waiver</h2>
+      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 1rem", lineHeight: 1.6 }}>
+        Please scroll through and read the entire document before proceeding.
+      </p>
+      <div
+        ref={scrollRef} onScroll={handleScroll}
+        style={{ ...styles.card, maxHeight: 280, overflowY: "auto", marginBottom: "1.25rem" }}
+      >
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "var(--text3)", marginBottom: "0.75rem" }}>LIABILITY WAIVER & CONSENT — ANNUAL BUSINESS MEET 2026</p>
+        <ol style={{ paddingLeft: "1.2rem" }}>
+          {CLAUSES.map((c, i) => (
+            <li key={i} style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12, lineHeight: 1.65 }}>{c}</li>
+          ))}
+        </ol>
+        <p style={{ fontSize: 11, color: "var(--text3)", marginTop: "0.75rem", fontStyle: "italic" }}>
+          Last updated: January 2026 · Acme Corporation · Mumbai, India
+        </p>
+      </div>
+
+      {!scrolled && (
+        <p style={{ fontSize: 12, color: "var(--amber-d)", textAlign: "center", marginBottom: "1rem", background: "var(--amber-l)", borderRadius: "var(--radius)", padding: "8px 12px" }}>
+          ↓ Please scroll through the document above to continue
+        </p>
+      )}
+
+      <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: scrolled ? "pointer" : "default", marginBottom: "1.5rem", opacity: scrolled ? 1 : 0.5 }}>
+        <input
+          type="checkbox" checked={consent} disabled={!scrolled}
+          onChange={e => setConsent(e.target.checked)}
+          style={{ width: "auto", marginTop: 3, flexShrink: 0, accentColor: "var(--amber)", cursor: scrolled ? "pointer" : "default" }}
+        />
+        <span style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+          I have read and fully understood the above liability waiver and consent terms, and I agree to be bound by them.
+        </span>
+      </label>
+
+      <PrimaryBtn onClick={onNext} disabled={!consent}>I Agree — Continue →</PrimaryBtn>
+    </div>
+  );
+}
+
+// ── Step 3: Social ────────────────────────────────────────────
+function SocialStep({ li, ig, setLi, setIg, onNext, onBack }) {
+  function openLink(url, done) {
+    window.open(url, "_blank");
+    setTimeout(done, 1000);
+  }
+
+  const SocialCard = ({ icon, color, platform, sub, done, onFollow }) => (
+    <div style={{ ...styles.card, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 1.25rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 9, background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
+          {icon}
+        </div>
+        <div>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{platform}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text2)" }}>{sub}</p>
+        </div>
+      </div>
+      {done
+        ? <span style={{ background: "var(--success-bg)", color: "var(--success)", fontSize: 12, padding: "5px 12px", borderRadius: "var(--radius)", fontWeight: 600 }}>✓ Done</span>
+        : <button onClick={onFollow} style={{ background: color, color: "#fff", border: "none", borderRadius: "var(--radius)", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "var(--font)" }}>
+            Follow →
+          </button>
+      }
+    </div>
+  );
+
+  return (
+    <div>
+      <button onClick={onBack} style={{ fontSize: 13, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", marginBottom: "1.25rem", padding: 0, fontFamily: "var(--font)" }}>← Back</button>
+      <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 0.4rem" }}>Connect with us</h2>
+      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 1.5rem", lineHeight: 1.6 }}>
+        Follow both pages to stay updated with live event announcements and highlights.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: "1.25rem" }}>
+        <SocialCard icon="in" color="#0A66C2" platform="LinkedIn" sub={`${C.companyName} · Company page`} done={li} onFollow={() => openLink(C.linkedinUrl, () => setLi(true))} />
+        <SocialCard icon="◎" color="#C13584" platform="Instagram" sub={`@${C.companyName.toLowerCase().replace(/\s/g,"")} · Event highlights`} done={ig} onFollow={() => openLink(C.instagramUrl, () => setIg(true))} />
+      </div>
+      {(!li || !ig) && (
+        <p style={{ fontSize: 12, color: "var(--text3)", textAlign: "center", marginBottom: "1rem" }}>
+          Follow both pages to unlock registration.
+        </p>
+      )}
+      <PrimaryBtn onClick={onNext} disabled={!li || !ig}>Continue to Registration →</PrimaryBtn>
+    </div>
+  );
+}
+
+// ── Step 4: Register ──────────────────────────────────────────
+const FIELDS = [
+  { key: "name", label: "FULL NAME", type: "text", placeholder: "Your full legal name" },
+  { key: "company", label: "COMPANY / ORGANISATION", type: "text", placeholder: "Company or firm name" },
+  { key: "designation", label: "DESIGNATION", type: "text", placeholder: "e.g. VP Operations, Director" },
+  { key: "email", label: "EMAIL ADDRESS", type: "email", placeholder: "you@company.com" },
+];
+
+function RegisterStep({ form, setForm, errors, loading, phone, onSubmit, onBack }) {
+  return (
+    <div>
+      <button onClick={onBack} style={{ fontSize: 13, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", marginBottom: "1.25rem", padding: 0, fontFamily: "var(--font)" }}>← Back</button>
+      <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 0.4rem" }}>Registration details</h2>
+      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 1.5rem" }}>Almost done. Just a few details.</p>
+
+      <div style={{ background: "var(--bg2)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "var(--text2)" }}>Verified mobile</span>
+        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "var(--mono)" }}>{phone}</span>
+      </div>
+
+      {FIELDS.map(({ key, label, type, placeholder }) => (
+        <div key={key} style={styles.field}>
+          <label style={styles.label}>{label}</label>
+          <input
+            type={type} placeholder={placeholder}
+            value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+            style={{ borderColor: errors[key] ? "var(--danger)" : undefined }}
+          />
+          {errors[key] && <p style={styles.error}>{errors[key]}</p>}
+        </div>
+      ))}
+      <PrimaryBtn onClick={onSubmit} disabled={loading} style={{ marginTop: "0.5rem" }}>
+        {loading ? "Submitting…" : "Complete Registration →"}
+      </PrimaryBtn>
+    </div>
+  );
+}
+
+// ── Success ───────────────────────────────────────────────────
+function SuccessStep({ name, regId }) {
+  return (
+    <div style={{ textAlign: "center", padding: "1.5rem 0 2rem" }}>
+      <div style={{ width: 64, height: 64, background: "var(--success-bg)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem", fontSize: 26 }}>
+        ✓
+      </div>
+      <h2 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 0.5rem" }}>You're registered!</h2>
+      <p style={{ color: "var(--text2)", fontSize: 15, margin: "0 0 2rem", lineHeight: 1.6 }}>
+        Welcome, {name}. We look forward to seeing you at the event.
+      </p>
+
+      <div style={{ ...styles.card, display: "inline-block", textAlign: "left", minWidth: 260, padding: "1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
+          <div>
+            <p style={{ fontSize: 10, color: "var(--text3)", margin: "0 0 3px", fontWeight: 600, letterSpacing: "0.08em" }}>REGISTRATION ID</p>
+            <p style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--mono)", color: "var(--amber)", letterSpacing: "0.05em" }}>{regId}</p>
+          </div>
+          <div style={{ width: 36, height: 36, background: "var(--amber)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>A</span>
+          </div>
+        </div>
+        <div style={{ height: "1px", background: "var(--border)", margin: "0 0 1.25rem" }} />
+        {[["Event",C.eventName],["Date",C.eventDate],["Venue",C.eventVenue]].map(([l,v]) => (
+          <div key={l} style={{ marginBottom: "0.85rem" }}>
+            <p style={{ fontSize: 10, color: "var(--text3)", margin: "0 0 2px", fontWeight: 600, letterSpacing: "0.08em" }}>{l.toUpperCase()}</p>
+            <p style={{ fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.4 }}>{v}</p>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ fontSize: 11, color: "var(--text3)", marginTop: "1.5rem", lineHeight: 1.6 }}>
+        A confirmation and event details will be sent<br/>to your WhatsApp before the event.
+      </p>
+    </div>
+  );
+}
+
+// ── Admin: Login ──────────────────────────────────────────────
+function AdminLogin({ pass, setPass, error, onLogin, onBack }) {
+  return (
+    <div style={{ maxWidth: 380, margin: "0 auto", padding: "2rem 1rem" }}>
+      <button onClick={onBack} style={{ fontSize: 13, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", marginBottom: "1.5rem", padding: 0, fontFamily: "var(--font)" }}>← Back to event</button>
+      <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 0.4rem" }}>Admin access</h2>
+      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 1.75rem" }}>Organiser dashboard. Authorised personnel only.</p>
+      <div style={styles.field}>
+        <label style={styles.label}>PASSWORD</label>
+        <input type="password" placeholder="Enter admin password" value={pass}
+          onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && onLogin()}
+          style={{ borderColor: error ? "var(--danger)" : undefined }}
+          autoFocus
+        />
+        {error && <p style={styles.error}>{error}</p>}
+      </div>
+      <PrimaryBtn onClick={onLogin}>Sign in →</PrimaryBtn>
+    </div>
+  );
+}
+
+// ── Admin: Dashboard ──────────────────────────────────────────
+const DEMO_ATTENDEES = [
+  { id: 1, name: "Raj Sharma", company: "Infosys", designation: "VP Operations", phone: "+91 98765 43210", email: "raj@infosys.com", time: "10 Apr, 09:14", status: "confirmed" },
+  { id: 2, name: "Priya Mehta", company: "TCS", designation: "Project Manager", phone: "+91 87654 32109", email: "priya@tcs.com", time: "10 Apr, 10:32", status: "confirmed" },
+  { id: 3, name: "Arjun Kapoor", company: "Wipro", designation: "Sr. Analyst", phone: "+91 76543 21098", email: "arjun@wipro.com", time: "11 Apr, 11:05", status: "confirmed" },
+  { id: 4, name: "Sneha Patil", company: "HCL Technologies", designation: "Tech Lead", phone: "+91 65432 10987", email: "sneha@hcl.com", time: "11 Apr, 14:22", status: "confirmed" },
+  { id: 5, name: "Vivek Nair", company: "Cognizant", designation: "Manager", phone: "+91 54321 09876", email: "vivek@cognizant.com", time: "12 Apr, 08:45", status: "confirmed" },
+];
+
+function AdminDashboard({ liveAttendees, onLogout }) {
+  const [tab, setTab] = useState("attendees");
+  const [q, setQ] = useState("");
+  const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sentMsg, setSentMsg] = useState(null);
+
+  const attendees = [...DEMO_ATTENDEES, ...liveAttendees];
+  const filtered = attendees.filter(a =>
+    [a.name, a.company, a.phone, a.email].join(" ").toLowerCase().includes(q.toLowerCase())
+  );
+
+  async function handleBroadcast() {
+    if (!msg.trim() || sending) return;
+    setSending(true);
+    let ok = 0;
+    for (const a of attendees) {
+      const r = await sendWhatsApp(a.phone, msg);
+      if (!r.error) ok++;
+    }
+    setSending(false);
+    setSentMsg(`✓ Sent to ${ok} of ${attendees.length} attendees`);
+    setMsg("");
+    setTimeout(() => setSentMsg(null), 5000);
+  }
+
+  const tabs = [["attendees","Attendees"],["announce","Announcements"],["setup","Setup Guide"]];
+
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto", padding: "1.25rem 1rem 3rem", fontFamily: "var(--font)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Admin Panel</h2>
+          <p style={{ fontSize: 12, color: "var(--text2)", margin: "3px 0 0" }}>{C.eventName}</p>
+        </div>
+        <button onClick={onLogout} style={{ fontSize: 12, color: "var(--text2)", background: "none", border: "1px solid var(--border2)", borderRadius: "var(--radius)", cursor: "pointer", padding: "7px 16px", fontFamily: "var(--font)" }}>Sign out</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: "1.5rem" }}>
+        {[
+          ["Total Registered", attendees.length],
+          ["Confirmed Today", 3],
+          ["Total Capacity", C.totalSeats],
+          ["Fill Rate", Math.round((attendees.length / C.totalSeats) * 100) + "%"],
+        ].map(([l,v]) => (
+          <div key={l} style={{ background: "var(--bg2)", borderRadius: "var(--radius)", padding: "14px 1rem" }}>
+            <p style={{ margin: 0, fontSize: 10, color: "var(--text3)", fontWeight: 600, letterSpacing: "0.06em" }}>{l.toUpperCase()}</p>
+            <p style={{ margin: "5px 0 0", fontSize: 24, fontWeight: 600 }}>{v}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", paddingBottom: "0.75rem", marginBottom: "1.25rem" }}>
+        {tabs.map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            background: tab === id ? "var(--bg2)" : "transparent",
+            border: tab === id ? "1px solid var(--border2)" : "1px solid transparent",
+            borderRadius: "var(--radius)", padding: "6px 16px", fontSize: 13,
+            fontWeight: tab === id ? 600 : 400, cursor: "pointer",
+            color: tab === id ? "var(--text)" : "var(--text2)", fontFamily: "var(--font)"
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {tab === "attendees" && (
+        <div>
+          <input type="text" placeholder="Search by name, company, phone, or email…" value={q} onChange={e => setQ(e.target.value)} style={{ marginBottom: "1rem", fontSize: 13 }} />
+          <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 640 }}>
+              <thead>
+                <tr>
+                  {["Name","Company","Designation","Phone","Email","Registered at"].map(h => (
+                    <th key={h} style={{ padding: "10px 13px", textAlign: "left", fontWeight: 600, fontSize: 10, color: "var(--text3)", letterSpacing: "0.07em", borderBottom: "1px solid var(--border)", background: "var(--bg2)", whiteSpace: "nowrap" }}>{h.toUpperCase()}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((a, i) => (
+                  <tr key={a.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg2)" }}>
+                    <td style={{ padding: "10px 13px", fontWeight: 600 }}>{a.name}</td>
+                    <td style={{ padding: "10px 13px", color: "var(--text2)" }}>{a.company}</td>
+                    <td style={{ padding: "10px 13px", color: "var(--text2)" }}>{a.designation}</td>
+                    <td style={{ padding: "10px 13px", fontFamily: "var(--mono)", fontSize: 12 }}>{a.phone}</td>
+                    <td style={{ padding: "10px 13px", color: "var(--text2)", fontSize: 12 }}>{a.email}</td>
+                    <td style={{ padding: "10px 13px", color: "var(--text3)", fontSize: 11, whiteSpace: "nowrap" }}>{a.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filtered.length === 0 && <p style={{ textAlign: "center", color: "var(--text3)", padding: "2rem", fontSize: 13 }}>No attendees match your search.</p>}
+          </div>
+          <p style={{ fontSize: 11, color: "var(--text3)", marginTop: "0.75rem" }}>{filtered.length} of {attendees.length} attendees shown · {DEMO_ATTENDEES.length} demo records</p>
+        </div>
+      )}
+
+      {tab === "announce" && (
+        <div>
+          <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 1.25rem", lineHeight: 1.6 }}>
+            Broadcast a WhatsApp message instantly to all <strong style={{ color: "var(--text)", fontWeight: 600 }}>{attendees.length} registered attendees</strong>.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: "1.5rem" }}>
+            {[
+              ["Entry Reminder","Reminder: Venue opens at 9:00 AM tomorrow. Please carry a valid photo ID. Looking forward to seeing you!"],
+              ["Schedule Change","Important update: The keynote has been moved to 10:30 AM. All other sessions remain unchanged."],
+              ["Day-of Update","The event is now live! Registration desk is open. Welcome to the Annual Business Meet 2026!"],
+            ].map(([title, template]) => (
+              <button key={title} onClick={() => setMsg(template)} style={{
+                background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "var(--radius)",
+                padding: "10px 12px", fontSize: 12, cursor: "pointer", textAlign: "left",
+                color: "var(--text2)", fontFamily: "var(--font)", lineHeight: 1.4
+              }}>
+                <strong style={{ color: "var(--text)", display: "block", marginBottom: 3, fontWeight: 600, fontSize: 11 }}>{title}</strong>
+                {template.substring(0, 48)}…
+              </button>
+            ))}
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>MESSAGE</label>
+            <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={5} placeholder={"Write your announcement here…\n\nDear delegate, please note that…"} />
+            <p style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{msg.length} characters</p>
+          </div>
+
+          {sentMsg && (
+            <div style={{ background: "var(--success-bg)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: "1rem", fontSize: 13, color: "var(--success)", fontWeight: 600 }}>
+              {sentMsg}
+            </div>
+          )}
+
+          <PrimaryBtn onClick={handleBroadcast} disabled={sending || !msg.trim()}>
+            {sending ? `Sending to ${attendees.length} attendees…` : `Send WhatsApp to ${attendees.length} attendees →`}
+          </PrimaryBtn>
+          <p style={{ fontSize: 11, color: "var(--text3)", marginTop: "0.75rem", textAlign: "center" }}>
+            Configure WhatsApp credentials in config.js before sending
+          </p>
+        </div>
+      )}
+
+      {tab === "setup" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {[
+            { num: "①", title: "Edit config.js", color: "var(--amber)", items: [
+              'Open config.js and fill in your event name, date, venue, and company details',
+              'Set your LinkedIn and Instagram page URLs',
+              'Change adminPassword to a strong password before going live',
+              'Leave gasUrl, waPhoneId, waToken until you complete steps below',
+            ]},
+            { num: "②", title: "Google Sheets database (free)", color: "#0F6E56", items: [
+              'Create a Google Sheet with columns: Phone | Name | Company | Designation | Email | RegisteredAt | RegID',
+              'In the Sheet, go to Extensions → Apps Script',
+              'Paste the code from gas/Code.gs (included in your downloaded files)',
+              'Click Deploy → New Deployment → Web App → Set "Who has access" to Anyone',
+              'Copy the Web App URL and paste it into config.js as gasUrl',
+            ]},
+            { num: "③", title: "WhatsApp Cloud API (free — 1,000 msg/month)", color: "#185FA5", items: [
+              'Go to developers.facebook.com → Create App → Select "Business"',
+              'Add the WhatsApp product to your app',
+              'Under WhatsApp → Getting Started, add and verify your business phone number',
+              'Generate a System User access token (under Business Settings → System Users)',
+              'Copy Phone Number ID and Access Token into config.js',
+            ]},
+            { num: "④", title: "Deploy on Vercel (free hosting)", color: "#3B6D11", items: [
+              'Put both files (index.html and config.js) into a GitHub repository',
+              'Go to vercel.com → New Project → Import your GitHub repo',
+              'Click Deploy — no build settings needed (static site)',
+              'Your app goes live at yourproject.vercel.app — share this link with delegates',
+              'For a custom domain (e.g. meet.yourcompany.com), add it in Vercel → Domains (free)',
+            ]},
+            { num: "⑤", title: "Security checklist before launch", color: "#993C1D", items: [
+              'Change adminPassword in config.js from the default to something strong',
+              'In Apps Script, add a secret token check so only your app can write to the Sheet',
+              'Test the full registration flow end-to-end with your own mobile number',
+              'Export the Google Sheet as a backup after each day of registrations',
+            ]},
+          ].map(({ num, title, color, items }) => (
+            <div key={title} style={{ ...styles.card }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "0.75rem" }}>
+                <span style={{ fontSize: 16, color }}>{num}</span>
+                <p style={{ fontWeight: 600, fontSize: 14, margin: 0, color }}>{title}</p>
+              </div>
+              <ol style={{ paddingLeft: "1.25rem" }}>
+                {items.map((it, i) => (
+                  <li key={i} style={{ fontSize: 13, color: "var(--text2)", marginBottom: 7, lineHeight: 1.6 }}>{it}</li>
+                ))}
+              </ol>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Root App ──────────────────────────────────────────────────
+function App() {
+  const [step, setStep] = useState("landing");
+  const [phone, setPhone] = useState("");
+  const [phoneErr, setPhoneErr] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [li, setLi] = useState(false);
+  const [ig, setIg] = useState(false);
+  const [form, setForm] = useState({ name: "", company: "", designation: "", email: "" });
+  const [formErrs, setFormErrs] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [regId, setRegId] = useState("");
+  const [adminPass, setAdminPass] = useState("");
+  const [adminErr, setAdminErr] = useState("");
+  const [liveAttendees, setLiveAttendees] = useState([]);
+
+  async function handlePhoneNext() {
+    const clean = phone.replace(/[\s\-()]/g, "");
+    if (!/^\+?[0-9]{10,13}$/.test(clean)) {
+      setPhoneErr("Please enter a valid mobile number (10–13 digits, with optional +country code).");
+      return;
+    }
+    setPhoneErr(""); setLoading(true);
+    const res = await gasApi("verify", { phone: clean });
+    setLoading(false);
+    if (res.exists) { setPhoneErr("This number is already registered. Contact the organiser if you need help."); return; }
+    setStep("consent");
+  }
+
+  async function handleRegister() {
+    const e = {};
+    if (!form.name.trim()) e.name = "Full name is required.";
+    if (!form.company.trim()) e.company = "Company or organisation is required.";
+    if (!form.designation.trim()) e.designation = "Designation is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email address.";
+    setFormErrs(e);
+    if (Object.keys(e).length) return;
+    setLoading(true);
+    const res = await gasApi("register", { phone, ...form, registeredAt: new Date().toISOString() });
+    setLoading(false);
+    if (res.success) {
+      setRegId(res.id);
+      const ts = new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+      setLiveAttendees(p => [...p, { id: Date.now(), ...form, phone, time: ts }]);
+      await sendWhatsApp(phone, `Dear ${form.name},\n\nYou are now registered for the ${C.eventName}.\n\nRegistration ID: ${res.id}\nDate: ${C.eventDate}\nVenue: ${C.eventVenue}\n\nWe look forward to welcoming you.\n\n— ${C.companyName}`);
+      setStep("success");
+    } else {
+      setFormErrs({ email: "Registration failed. Please try again or contact the organiser." });
+    }
+  }
+
+  function handleAdminLogin() {
+    if (adminPass === C.adminPassword) { setAdminErr(""); setStep("admin"); }
+    else setAdminErr("Incorrect password.");
+  }
+
+  // Admin routes
+  if (step === "admin-login") return (
+    <AdminLogin pass={adminPass} setPass={setAdminPass} error={adminErr}
+      onLogin={handleAdminLogin}
+      onBack={() => { setStep("landing"); setAdminPass(""); setAdminErr(""); }}
+    />
+  );
+  if (step === "admin") return (
+    <AdminDashboard liveAttendees={liveAttendees} onLogout={() => { setStep("landing"); setAdminPass(""); }} />
+  );
+
+  // Main flow
+  return (
+    <div style={styles.page}>
+      <ProgressBar step={step} />
+      {step === "landing" && <Landing onStart={() => setStep("phone")} onAdmin={() => setStep("admin-login")} />}
+      {step === "phone" && <PhoneStep phone={phone} setPhone={setPhone} error={phoneErr} loading={loading} onNext={handlePhoneNext} onBack={() => setStep("landing")} />}
+      {step === "consent" && <ConsentStep consent={consent} setConsent={setConsent} onNext={() => setStep("social")} onBack={() => setStep("phone")} />}
+      {step === "social" && <SocialStep li={li} ig={ig} setLi={setLi} setIg={setIg} onNext={() => setStep("register")} onBack={() => setStep("consent")} />}
+      {step === "register" && <RegisterStep form={form} setForm={setForm} errors={formErrs} loading={loading} phone={phone} onSubmit={handleRegister} onBack={() => setStep("social")} />}
+      {step === "success" && <SuccessStep name={form.name} regId={regId} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
